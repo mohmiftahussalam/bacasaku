@@ -20,20 +20,35 @@ Buka `index.html` dengan klik dua klik, atau jalankan task **Buka Website di Bro
 
 > Untuk mencoba tanpa punya file: impor file contoh di folder `contoh/` (`buku-contoh.txt` atau `buku-contoh.epub`).
 
-## Deploy ke Vercel
+## Deploy ke Vercel (otomatis via GitHub)
 
 Situs ini sudah live: **https://try-vert-delta.vercel.app**
 
-Untuk deploy ulang setelah ada perubahan:
+Kode sumber ada di GitHub: **https://github.com/mohmiftahussalam/bacasaku**
+
+Proyek Vercel sudah terhubung ke repository GitHub (branch produksi: `main`), jadi **setiap `git push` ke `main` akan otomatis di-deploy ke Vercel** — tidak perlu deploy manual lagi:
+
+```powershell
+git add -A
+git commit -m "deskripsi perubahan"
+git push
+```
+
+Deploy selesai dalam ± 30 detik dan bisa dipantau di https://vercel.com/teams-7fb3/try/deployments.
+
+<details>
+<summary>Alternatif: deploy manual dari terminal (tanpa GitHub)</summary>
 
 ```powershell
 npx vercel@latest deploy --prod --yes
 ```
 
+</details>
+
 Catatan:
 
 - Proyek statis — tidak ada build step (Vercel mendeteksi output = root folder)
-- `.vercelignore` mengecualikan `.github/` dari upload
+- `.vercelignore` mengecualikan `.github/` dari upload manual; `.gitignore` mengecualikan folder `.vercel/` dari repository
 - Deployment Protection sudah dimatikan agar bisa dibuka langsung dari HP
 
 ## Struktur Proyek
