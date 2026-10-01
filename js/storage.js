@@ -7,8 +7,10 @@
   const STORE = 'books';
   const META_KEY = 'bacasaku.books';
   const PROGRESS_PREFIX = 'bacasaku.progress.';
+  const BOOKMARK_PREFIX = 'bacasaku.bookmarks.';
   const SETTINGS_KEY = 'bacasaku.settings';
   const CONTENT_PREFIX = 'bacasaku.content.';
+  const STATS_KEY = 'bacasaku.stats';
 
   let dbPromise = null;
 
@@ -89,6 +91,7 @@
         .then(() => {
           writeMeta(readMeta().filter(b => b.id !== id));
           localStorage.removeItem(PROGRESS_PREFIX + id);
+          localStorage.removeItem(BOOKMARK_PREFIX + id);
         });
     },
 
@@ -99,8 +102,30 @@
       catch (e) { return null; }
     },
 
+    /** `at` = waktu terakhir dibaca, dipakai untuk urutan "Terakhir dibaca". */
     setProgress(id, page, pages) {
-      localStorage.setItem(PROGRESS_PREFIX + id, JSON.stringify({ page, pages }));
+      localStorage.setItem(PROGRESS_PREFIX + id,
+        JSON.stringify({ page, pages, at: Date.now() }));
+    },
+
+    /* ---------- penanda halaman (bookmark) ---------- */
+    getBookmarks(id) {
+      try { return JSON.parse(localStorage.getItem(BOOKMARK_PREFIX + id) || '[]'); }
+      catch (e) { return []; }
+    },
+
+    saveBookmarks(id, list) {
+      localStorage.setItem(BOOKMARK_PREFIX + id, JSON.stringify(list));
+    },
+
+    /* ---------- statistik baca ---------- */
+    getStats() {
+      try { return JSON.parse(localStorage.getItem(STATS_KEY) || 'null') || { days: {} }; }
+      catch (e) { return { days: {} }; }
+    },
+
+    saveStats(stats) {
+      localStorage.setItem(STATS_KEY, JSON.stringify(stats));
     },
 
     getSettings() {

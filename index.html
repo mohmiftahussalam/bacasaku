@@ -13,7 +13,10 @@
   <div id="screen-library" class="screen active">
     <header class="lib-header">
       <div class="brand">Baca<span>Saku</span></div>
-      <button id="btn-import-top" class="icon-btn" title="Impor buku">＋</button>
+      <div class="lib-actions">
+        <button id="btn-stats" class="icon-btn" title="Statistik baca">📊</button>
+        <button id="btn-import-top" class="icon-btn" title="Impor buku">＋</button>
+      </div>
     </header>
 
     <main class="lib-main">
@@ -22,6 +25,17 @@
         <h2>Belum ada buku</h2>
         <p>Impor file <b>EPUB</b> atau <b>TXT</b> dari HP kamu, lalu baca nyaman layaknya e-reader saku.</p>
         <button id="btn-import-empty" class="btn-primary">Pilih File</button>
+      </div>
+
+      <div class="lib-toolbar" id="lib-toolbar" hidden>
+        <span class="lib-count" id="lib-count">0 buku</span>
+        <label class="lib-sort">Urut:
+          <select id="lib-sort" aria-label="Urutkan buku">
+            <option value="recent">Terakhir dibaca</option>
+            <option value="added">Terbaru</option>
+            <option value="title">Judul A–Z</option>
+          </select>
+        </label>
       </div>
 
       <ul id="book-list" class="book-list"></ul>
@@ -42,6 +56,7 @@
       <button id="btn-back" class="icon-btn" title="Kembali ke pustaka">←</button>
       <div class="reader-title" id="reader-title">Judul</div>
       <button id="btn-toc" class="icon-btn" title="Daftar isi">☰</button>
+      <button id="btn-bookmark" class="icon-btn" title="Tandai halaman ini">🔖</button>
       <button id="btn-focus" class="icon-btn" title="Mode fokus">⛶</button>
       <button id="btn-settings" class="icon-btn aa-btn" title="Setelan baca">Aa</button>
     </header>
@@ -103,11 +118,16 @@
       </div>
     </section>
 
-    <!-- panel daftar isi -->
+    <!-- panel daftar isi + penanda -->
     <section class="sheet" id="sheet-toc" hidden aria-label="Daftar isi">
       <div class="sheet-handle"></div>
-      <h3 class="sheet-title">Daftar Isi</h3>
-      <ul id="toc-list" class="toc-list"></ul>
+      <div class="sheet-tabs" id="sheet-tabs" role="tablist">
+        <button role="tab" data-tab="toc" class="active" aria-selected="true">Daftar Isi</button>
+        <button role="tab" data-tab="bm" aria-selected="false">Penanda <span class="tab-badge" id="bm-count" hidden>0</span></button>
+      </div>
+      <ul id="toc-list" class="toc-list" data-panel="toc"></ul>
+      <ul id="bm-list" class="toc-list bm-list" data-panel="bm" hidden></ul>
+      <p class="bm-empty" id="bm-empty" hidden>Belum ada penanda. Ketuk 🔖 di bilah atas untuk menandai halaman ini.</p>
     </section>
   </div>
 
@@ -116,6 +136,25 @@
     <div class="spinner"></div>
     <p id="loading-text">Memuat buku…</p>
   </div>
+
+  <!-- panel statistik (level body — dibuka dari pustaka) -->
+  <div class="sheet-backdrop" id="stats-backdrop" hidden></div>
+  <section class="sheet" id="sheet-stats" hidden aria-label="Statistik baca">
+    <div class="sheet-handle"></div>
+    <h3 class="sheet-title">📊 Statistik Baca</h3>
+
+    <div class="stat-cards">
+      <div class="stat-card"><b id="st-today">0 mnt</b><span>Hari ini</span></div>
+      <div class="stat-card"><b id="st-streak">0</b><span>Streak (hari)</span></div>
+      <div class="stat-card"><b id="st-total">0</b><span>Total waktu</span></div>
+      <div class="stat-card"><b id="st-books">0</b><span>Buku di pustaka</span></div>
+    </div>
+
+    <div class="stat-chart" id="stat-chart"></div>
+    <p class="stat-note">Waktu baca 7 hari terakhir</p>
+
+    <button class="btn-ghost" id="btn-stats-close">Tutup</button>
+  </section>
 
   <div id="toast" class="toast" hidden></div>
 

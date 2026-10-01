@@ -38,7 +38,24 @@
     loadingText: $('loading-text'),
     toast: $('toast'),
     readerTop: document.querySelector('header.reader-top'),
-    readerBottom: document.querySelector('footer.reader-bottom')
+    readerBottom: document.querySelector('footer.reader-bottom'),
+    btnBookmark: $('btn-bookmark'),
+    sheetTabs: $('sheet-tabs'),
+    bmList: $('bm-list'),
+    bmCount: $('bm-count'),
+    bmEmpty: $('bm-empty'),
+    libToolbar: $('lib-toolbar'),
+    libCount: $('lib-count'),
+    libSort: $('lib-sort'),
+    btnStats: $('btn-stats'),
+    sheetStats: $('sheet-stats'),
+    statsBackdrop: $('stats-backdrop'),
+    btnStatsClose: $('btn-stats-close'),
+    stToday: $('st-today'),
+    stStreak: $('st-streak'),
+    stTotal: $('st-total'),
+    stBooks: $('st-books'),
+    statChart: $('stat-chart')
   };
 
   const FONTS = {
@@ -50,16 +67,19 @@
 
   /* ---------------- state ---------------- */
   let settings = Object.assign(
-    { size: 18, font: 'serif', leading: 1.7, margin: 18, theme: 'terang' },
+    { size: 18, font: 'serif', leading: 1.7, margin: 18, theme: 'terang', libSort: 'recent' },
     BSStorage.getSettings() || {}
   );
   let books = [];          // meta buku
   let current = null;      // buku yang sedang dibaca
+  let bookmarks = [];      // penanda halaman buku saat ini
   let pages = 1;           // jumlah halaman
   let page = 0;            // halaman sekarang (0-based)
   let pageW = 0;           // lebar satu halaman (px)
   let chapterStarts = [];  // [{ index, title, page }]
   let relayoutTimer = null;
+  let stats = BSStorage.getStats();   // { days: { 'YYYY-MM-DD': detik } }
+  let lastStatTick = Date.now();
 
   /* ---------------- util ---------------- */
   function escapeHtml(s) {
@@ -136,15 +156,40 @@
     const has = books.length > 0;
     el.emptyState.hidden = has;
     el.bookList.hidden = !has;
-    el.bookList.innerHTML = '';
+    el.libToolbar.hidden = !has;
+    el.libCount.textContent = books.length + ' buku';
+    el.libSort.value = settings.libSort;
 
-    books.forEach(b => {
-      const prog = BSStorage.getProgress(b.id);
-      const pct = (prog && prog.pages > 1)
+    // progres tiap buku (untuk % & urutan "terakhir dibaca")
+    const info = {};
+    books.forEach(b => { info[b.id] = BSStorage.getProgress(b.id) || {}; });
+
+    const sorted = books.slice();
+    if (settings.libSort === 'title') {
+      sorted.sort((a, b) => a.title.localeCompare(b.title, 'id'));
+    } else if (settings.libSort === 'added') {
+      sorted.sort((a, b) => b.addedAt - a.addedAt);
+    } else {
+      // terakhir dibaca dulu; yang belum pernah dibaca di bawah, menurut tanggal impor
+      sorted.sort((a, b) => (info[b.id].at || 0) - (info[a.id].at || 0)
+        || b.addedAt - a.addedAt);
+    }
+    // buku yang paling baru dibaca → disorot
+    let recentId = '';
+    let recentAt = 0;
+    sorted.forEach(b => {
+      if ((info[b.id].at || 0) > recentAt) { recentAt = info[b.id].at; recentId = b.id; }
+    });
+
+    el.bookList.innerHTML = '';
+    sorted.forEach(b => {
+      const prog = info[b.id];
+      const pct = (prog.pages > 1)
         ? Math.min(100, Math.round(prog.page / (prog.pages - 1) * 100))
         : 0;
+      const isRecent = recentAt > 0 && b.id === recentId;
       const li = document.createElement('li');
-      li.className = 'book-card';
+      li.className = 'book-card' + (isRecent ? ' recent' : '');
       li.dataset.id = b.id;
       li.innerHTML =
         '<div class="book-cover">' + (b.format === 'epub' ? '📘' : '📄') + '</div>' +
@@ -152,6 +197,7 @@
           '<div class="book-title">' + escapeHtml(b.title) + '</div>' +
           '<div class="book-meta">' + b.format.toUpperCase() +
             (pct > 0 ? ' &middot; ' + pct + '% dibaca' : ' &middot; belum dibaca') +
+            (isRecent ? '<span class="book-badge">TERAKHIR DIBACA</span>' : '') +
           '</div>' +
           '<div class="book-progress"><i style="width:' + Math.max(pct, 1.5) + '%"></i></div>' +
         '</div>' +
@@ -159,6 +205,12 @@
       el.bookList.appendChild(li);
     });
   }
+
+  el.libSort.addEventListener('change', () => {
+    settings.libSort = el.libSort.value;
+    BSStorage.saveSettings(settings);
+    renderLibrary();
+  });
 
   el.bookList.addEventListener('click', e => {
     const card = e.target.closest('.book-card');
@@ -224,6 +276,7 @@
     BSStorage.getBook(id).then(book => {
       if (!book) throw new Error('Buku tidak ditemukan');
       current = book;
+      bookmarks = BSStorage.getBookmarks(book.id);
       el.readerTitle.textContent = book.title;
       el.flow.innerHTML = book.chapters.map((c, i) => {
         const hasHeading = /^\s*<h[1-3][^>]*>/i.test(c.html);
@@ -344,9 +397,108 @@
     el.chapterLabel.textContent = currentChapterTitle();
     el.progressSlider.max = pages;
     el.progressSlider.value = page + 1;
+    updateBookmarkUi();
     const cur = currentChapterTitle();
     el.tocList.querySelectorAll('li').forEach(li => {
       li.classList.toggle('current', li.textContent.trim() === cur);
+    });
+  }
+
+  /* ---------------- penanda halaman ---------------- */
+  /* Posisi disimpan sebagai RASIO page/(pages-1) supaya tetap valid
+     walau ukuran font/margin/layar berubah → halaman berbeda nanti. */
+  function ratioOfPage(p) { return pages > 1 ? p / (pages - 1) : 0; }
+  function pageOfRatio(r) { return Math.max(0, Math.min(pages - 1, Math.round(r * (pages - 1)))); }
+
+  function snippetAtTop() {
+    // ambil potongan teks di bagian atas halaman sekarang;
+    // coba beberapa titik karena awal halaman bisa berupa padding/judul bab
+    try {
+      const r = el.viewport.getBoundingClientRect();
+      const probes = [
+        [r.left + 34, r.top + 30],
+        [r.left + 34, r.top + 14],
+        [r.left + 60, r.top + 44]
+      ];
+      for (const [x, y] of probes) {
+        const range = document.caretRangeFromPoint && document.caretRangeFromPoint(x, y);
+        if (!range || !range.startContainer) continue;
+        const node = range.startContainer;
+        const text = (node.nodeType === 3 ? node.textContent : node.textContent || '')
+          .slice(range.startOffset || 0).replace(/\s+/g, ' ').trim();
+        if (text.length > 6) return text.slice(0, 72) + (text.length > 72 ? '…' : '');
+      }
+    } catch (e) { /* caretRangeFromPoint tidak tersedia → abaikan */ }
+    return currentChapterTitle();   // cadangan: nama bab
+  }
+
+  function bmOnThisPage() {
+    return bookmarks.findIndex(b => pageOfRatio(b.pos) === page);
+  }
+
+  function updateBookmarkUi() {
+    if (!el.btnBookmark) return;
+    el.btnBookmark.classList.toggle('marked', !!current && bmOnThisPage() >= 0);
+    el.bmCount.hidden = bookmarks.length === 0;
+    el.bmCount.textContent = bookmarks.length;
+  }
+
+  function toggleBookmark() {
+    if (!current) return;
+    const i = bmOnThisPage();
+    if (i >= 0) {
+      bookmarks.splice(i, 1);
+      toast('Penanda dihapus');
+    } else {
+      bookmarks.push({
+        pos: ratioOfPage(page),
+        snippet: snippetAtTop(),
+        chapter: currentChapterTitle(),
+        ts: Date.now()
+      });
+      bookmarks.sort((a, b) => a.pos - b.pos);
+      toast('Halaman ditandai 🔖');
+    }
+    BSStorage.saveBookmarks(current.id, bookmarks);
+    updateBookmarkUi();
+    if (!el.sheetToc.hidden) buildBmList();   // sheet terbuka → segarkan daftar
+  }
+
+  function buildBmList() {
+    el.bmList.innerHTML = '';
+    // pesan kosong hanya untuk tab Penanda, bukan tab Daftar Isi
+    el.bmEmpty.hidden = bookmarks.length > 0 || el.bmList.hidden;
+    bookmarks.forEach((b, i) => {
+      const target = pageOfRatio(b.pos);
+      const li = document.createElement('li');
+
+      const go = document.createElement('button');
+      go.className = 'bm-item';
+      const sn = document.createElement('span');
+      sn.className = 'bm-snippet';
+      sn.textContent = b.snippet || '(tanpa teks)';
+      const meta = document.createElement('span');
+      meta.className = 'bm-meta';
+      meta.textContent = 'Hal. ' + (target + 1) + ' · ' + (b.chapter || '');
+      go.appendChild(sn);
+      go.appendChild(meta);
+      go.addEventListener('click', () => { goTo(target); closeSheets(); });
+
+      const del = document.createElement('button');
+      del.className = 'bm-del';
+      del.textContent = '✕';
+      del.title = 'Hapus penanda';
+      del.addEventListener('click', ev => {
+        ev.stopPropagation();
+        bookmarks.splice(i, 1);
+        BSStorage.saveBookmarks(current.id, bookmarks);
+        updateBookmarkUi();
+        buildBmList();
+      });
+
+      li.appendChild(go);
+      li.appendChild(del);
+      el.bmList.appendChild(li);
     });
   }
 
@@ -384,6 +536,7 @@
     if (!el.screenReader.classList.contains('active')) return;
     if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); goTo(page + 1); }
     else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); goTo(page - 1); }
+    else if (e.key === 'b' || e.key === 'B') { toggleBookmark(); }
     else if (e.key === 'Escape') {
       if (!sheetsClosed()) closeSheets();
       else if (document.body.classList.contains('focus-mode')) toggleFocus();
@@ -399,35 +552,50 @@
 
   /* ---------------- panel (sheet) ---------------- */
   function sheetsClosed() {
-    return el.sheetSettings.hidden && el.sheetToc.hidden;
+    return el.sheetSettings.hidden && el.sheetToc.hidden && el.sheetStats.hidden;
+  }
+
+  function backdropFor(sheet) {
+    return sheet === el.sheetStats ? el.statsBackdrop : el.sheetBackdrop;
   }
 
   function openSheet(sheet) {
     closeSheets(true);
-    el.sheetBackdrop.hidden = false;
+    const bd = backdropFor(sheet);
+    bd.hidden = false;
     sheet.hidden = false;
     requestAnimationFrame(() => {
-      el.sheetBackdrop.classList.add('open');
+      bd.classList.add('open');
       sheet.classList.add('open');
     });
   }
 
   function closeSheets(instant) {
-    [el.sheetSettings, el.sheetToc].forEach(s => {
+    [el.sheetSettings, el.sheetToc, el.sheetStats].forEach(s => {
       if (s.hidden) return;
       s.classList.remove('open');
       const hide = () => { if (!s.classList.contains('open')) s.hidden = true; };
       instant ? hide() : setTimeout(hide, 300);
     });
-    el.sheetBackdrop.classList.remove('open');
-    const hideBd = () => { if (!el.sheetBackdrop.classList.contains('open')) el.sheetBackdrop.hidden = true; };
-    instant ? hideBd() : setTimeout(hideBd, 300);
+    [el.sheetBackdrop, el.statsBackdrop].forEach(bd => {
+      if (bd.hidden) return;
+      bd.classList.remove('open');
+      const hideBd = () => { if (!bd.classList.contains('open')) bd.hidden = true; };
+      instant ? hideBd() : setTimeout(hideBd, 300);
+    });
   }
 
   el.sheetBackdrop.addEventListener('click', () => closeSheets());
+  el.statsBackdrop.addEventListener('click', () => closeSheets());
   el.btnSettings.addEventListener('click', () => openSheet(el.sheetSettings));
-  el.btnToc.addEventListener('click', () => { buildToc(); openSheet(el.sheetToc); });
+  el.btnToc.addEventListener('click', () => {
+    buildToc();
+    buildBmList();
+    switchTab('toc');
+    openSheet(el.sheetToc);
+  });
   el.btnFocus.addEventListener('click', toggleFocus);   // tombol ⛶ = mode fokus
+  el.btnBookmark.addEventListener('click', toggleBookmark);  // 🔖 = tandai halaman
 
   /* ---------------- daftar isi ---------------- */
   function buildToc() {
@@ -445,6 +613,100 @@
     });
     updateHud();
   }
+
+  /* tab dalam sheet: Daftar Isi ⇄ Penanda */
+  function switchTab(name) {
+    el.sheetTabs.querySelectorAll('button').forEach(btn => {
+      const on = btn.dataset.tab === name;
+      btn.classList.toggle('active', on);
+      btn.setAttribute('aria-selected', String(on));
+    });
+    el.tocList.hidden = name !== 'toc';
+    el.bmList.hidden = name !== 'bm';
+    el.bmEmpty.hidden = name !== 'bm' || bookmarks.length > 0;
+  }
+
+  el.sheetTabs.addEventListener('click', e => {
+    const btn = e.target.closest('button[data-tab]');
+    if (btn) switchTab(btn.dataset.tab);
+  });
+
+  /* ---------------- statistik baca ---------------- */
+  function dayKey(d) {
+    d = d || new Date();
+    return d.getFullYear() + '-' +
+      String(d.getMonth() + 1).padStart(2, '0') + '-' +
+      String(d.getDate()).padStart(2, '0');
+  }
+
+  function fmtDur(sec) {
+    sec = Math.max(0, Math.round(sec));
+    if (sec < 60) return sec + ' dtk';
+    const m = Math.round(sec / 60);
+    if (m < 60) return m + ' mnt';
+    const h = Math.floor(m / 60);
+    return h + 'j ' + (m % 60) + 'm';
+  }
+
+  /* Akumulasi waktu baca: tiap ketukan, hanya jika layar baca tampil
+     dan tab aktif. `force` = flush saat tab mau disembunyikan/tutup
+     (saat itu document.hidden sudah true, jadi tanpa force keburu return). */
+  function tickReading(force) {
+    const now = Date.now();
+    const elapsed = (now - lastStatTick) / 1000;
+    lastStatTick = now;
+    if (elapsed < 1) return;
+    if (!force && document.hidden) return;
+    if (!el.screenReader.classList.contains('active') || !current) return;
+    stats.days = stats.days || {};
+    const k = dayKey();
+    stats.days[k] = (stats.days[k] || 0) + Math.round(elapsed);
+    BSStorage.saveStats(stats);
+  }
+  setInterval(tickReading, 15000);
+  document.addEventListener('visibilitychange', e => {
+    if (e.target.hidden) tickReading(true);   // flush sisa waktu sebelum tab disembunyikan
+    lastStatTick = Date.now();                // waktu tersembunyikan tidak dihitung
+  });
+  window.addEventListener('pagehide', () => tickReading(true));
+
+  function computeStreak(days) {
+    let n = 0;
+    const d = new Date();
+    if (!(days[dayKey(d)] > 0)) d.setDate(d.getDate() - 1);  // hari ini belum baca → mulai kemarin
+    while (days[dayKey(d)] > 0) { n++; d.setDate(d.getDate() - 1); }
+    return n;
+  }
+
+  function openStats() {
+    const days = stats.days || {};
+    el.stToday.textContent = fmtDur(days[dayKey()] || 0);
+    el.stStreak.textContent = computeStreak(days);
+    let total = 0;
+    Object.keys(days).forEach(k => { total += days[k] || 0; });
+    el.stTotal.textContent = fmtDur(total);
+    el.stBooks.textContent = String(books.length);
+
+    // grafik 7 hari terakhir
+    const labels = ['M', 'S', 'S', 'R', 'K', 'J', 'S'];   // min…sab (getDay)
+    const vals = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      vals.push({ v: days[dayKey(d)] || 0, label: labels[d.getDay()], today: i === 0 });
+    }
+    const max = Math.max(1, ...vals.map(x => x.v));
+    el.statChart.innerHTML = vals.map(x =>
+      '<div class="stat-col' + (x.today ? ' today' : '') + '" title="' + fmtDur(x.v) + '">' +
+        '<i style="height:' + Math.max(4, Math.round(x.v / max * 100)) + '%"></i>' +
+        '<span>' + x.label + '</span>' +
+      '</div>').join('');
+
+    openSheet(el.sheetStats);
+  }
+
+  el.btnStats.addEventListener('click', openStats);
+  el.btnStatsClose.addEventListener('click', () => closeSheets());
 
   /* ---------------- kontrol setelan ---------------- */
   el.setSize.addEventListener('input', () => {
@@ -472,6 +734,8 @@
   el.btnBack.addEventListener('click', goLibrary);
 
   function goLibrary() {
+    tickReading(true);       // simpan waktu baca sampai detik ini
+    lastStatTick = Date.now();
     closeSheets();
     showScreen('library');
     renderLibrary();
