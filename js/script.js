@@ -36,7 +36,9 @@
     setTheme: $('set-theme'),
     loading: $('loading-overlay'),
     loadingText: $('loading-text'),
-    toast: $('toast')
+    toast: $('toast'),
+    readerTop: document.querySelector('header.reader-top'),
+    readerBottom: document.querySelector('footer.reader-bottom')
   };
 
   const FONTS = {
@@ -255,6 +257,22 @@
   }
 
   /* ---------------- tata letak halaman ---------------- */
+  /* Ukur tinggi bilah atas/bawah → var CSS --rtop/--rbot, lalu viewport
+     di inset di bawah bilah supaya teks tidak pernah tertutup bilah.
+     Padding vertikal .reader-flow juga berlaku untuk semua kolom (halaman). */
+  function updateBarInsets() {
+    const ss = el.screenReader.style;
+    if (document.body.classList.contains('focus-mode')) {
+      ss.setProperty('--rtop', 'calc(env(safe-area-inset-top, 0px) + 4px)');
+      ss.setProperty('--rbot', 'calc(env(safe-area-inset-bottom, 0px) + 6px)');
+      return;
+    }
+    const t = el.readerTop.offsetHeight;
+    const b = el.readerBottom.offsetHeight;
+    if (t) ss.setProperty('--rtop', t + 'px');
+    if (b) ss.setProperty('--rbot', b + 'px');
+  }
+
   function relayout(keepRatio) {
     if (!current) return;
     const ratio = pages > 1 ? page / (pages - 1) : 0;
@@ -265,6 +283,7 @@
 
     const W = el.viewport.clientWidth;
     if (!W) { el.flow.style.transition = ''; return; }
+    updateBarInsets();          // sebelum ukur tinggi flow (mengubah tinggi viewport)
     pageW = W;
     el.flow.style.setProperty('--page-w', W + 'px');
 
@@ -375,6 +394,7 @@
   function toggleFocus() {
     const on = document.body.classList.toggle('focus-mode');
     toast(on ? 'Mode fokus — ketuk tengah untuk menu' : 'Menu tampil lagi');
+    if (current) relayout(true);   // inset viewport berubah → tata ulang halaman
   }
 
   /* ---------------- panel (sheet) ---------------- */
@@ -407,6 +427,7 @@
   el.sheetBackdrop.addEventListener('click', () => closeSheets());
   el.btnSettings.addEventListener('click', () => openSheet(el.sheetSettings));
   el.btnToc.addEventListener('click', () => { buildToc(); openSheet(el.sheetToc); });
+  el.btnFocus.addEventListener('click', toggleFocus);   // tombol ⛶ = mode fokus
 
   /* ---------------- daftar isi ---------------- */
   function buildToc() {

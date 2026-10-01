@@ -134,8 +134,13 @@ button:active{ transform: scale(.97); }
 }
 
 /* ================= LAYAR BACA ================= */
+/* viewport di inset di bawah bilah atas & di atas bilah bawah supaya
+   teks tidak pernah tertutup bilah (tinggi bilah diukur dari JS → --rtop/--rbot) */
 .reader-viewport{
-  position: absolute; top: 0; bottom: 0; left: 50%;
+  position: absolute;
+  top: var(--rtop, 55px);
+  bottom: var(--rbot, 37px);
+  left: 50%;
   transform: translateX(-50%);
   width: min(100vw, 680px);
   overflow: hidden;
@@ -147,13 +152,16 @@ button:active{ transform: scale(.97); }
   height: 100%;
   column-width: var(--page-w);
   column-gap: 0;
+  /* padding container multicol berlaku untuk SEMUA kolom (halaman),
+     bukan hanya halaman pertama */
+  padding: 12px 0 16px;
   transition: transform .22s ease;
   will-change: transform;
 }
 
 .reader-flow section{
   break-before: column;
-  padding: 52px var(--pad-x) 84px;
+  padding: 8px var(--pad-x) 16px;
 }
 .reader-flow section:first-child{ break-before: auto; }
 
