@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f5f0">
+  <title>BacaSaku — Baca nyaman di HP</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-theme="terang">
+
+  <!-- ================= LAYAR PUSTAKA ================= -->
+  <div id="screen-library" class="screen active">
+    <header class="lib-header">
+      <div class="brand">Baca<span>Saku</span></div>
+      <button id="btn-import-top" class="icon-btn" title="Impor buku">＋</button>
+    </header>
+
+    <main class="lib-main">
+      <div id="empty-state" class="empty-state" hidden>
+        <div class="empty-art">📖</div>
+        <h2>Belum ada buku</h2>
+        <p>Impor file <b>EPUB</b> atau <b>TXT</b> dari HP kamu, lalu baca nyaman layaknya e-reader saku.</p>
+        <button id="btn-import-empty" class="btn-primary">Pilih File</button>
+      </div>
+
+      <ul id="book-list" class="book-list"></ul>
+    </main>
+
+    <button id="btn-import-fab" class="fab" title="Impor buku">＋</button>
+    <input type="file" id="file-input" accept=".epub,.txt,.text" hidden>
+  </div>
+
+  <!-- ================= LAYAR BACA ================= -->
+  <div id="screen-reader" class="screen">
+    <div class="reader-viewport" id="reader-viewport">
+      <div class="reader-flow" id="reader-flow"></div>
+    </div>
+
+    <!-- bilah atas (hilang di mode fokus) -->
+    <header class="reader-bar reader-top" id="reader-top">
+      <button id="btn-back" class="icon-btn" title="Kembali ke pustaka">←</button>
+      <div class="reader-title" id="reader-title">Judul</div>
+      <button id="btn-toc" class="icon-btn" title="Daftar isi">☰</button>
+      <button id="btn-focus" class="icon-btn" title="Mode fokus">⛶</button>
+      <button id="btn-settings" class="icon-btn aa-btn" title="Setelan baca">Aa</button>
+    </header>
+
+    <!-- bilah bawah: progres -->
+    <footer class="reader-bar reader-bottom" id="reader-bottom">
+      <span class="chapter-label" id="chapter-label">—</span>
+      <input type="range" id="progress-slider" min="1" max="100" value="1" step="1" aria-label="Progres baca">
+      <span class="page-label" id="page-label">1 / 1</span>
+    </footer>
+
+    <!-- panel setelan baca -->
+    <div class="sheet-backdrop" id="sheet-backdrop" hidden></div>
+
+    <section class="sheet" id="sheet-settings" hidden aria-label="Setelan baca">
+      <div class="sheet-handle"></div>
+      <h3 class="sheet-title">Setelan Baca</h3>
+
+      <div class="setting-row">
+        <label for="set-size">Ukuran teks</label>
+        <input type="range" id="set-size" min="14" max="30" step="1">
+        <span class="setting-val" id="val-size">18</span>
+      </div>
+
+      <div class="setting-row">
+        <label>Font</label>
+        <div class="segmented" id="set-font">
+          <button data-val="serif" class="active">Serif</button>
+          <button data-val="sans">Sans</button>
+          <button data-val="mono">Mono</button>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <label>Jarak baris</label>
+        <div class="segmented" id="set-leading">
+          <button data-val="1.5">Rapat</button>
+          <button data-val="1.7" class="active">Normal</button>
+          <button data-val="1.95">Longgar</button>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <label>Margin</label>
+        <div class="segmented" id="set-margin">
+          <button data-val="8">Sempit</button>
+          <button data-val="18" class="active">Sedang</button>
+          <button data-val="30">Luas</button>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <label>Tema</label>
+        <div class="segmented theme-seg" id="set-theme">
+          <button data-val="terang" class="active">☀️ Terang</button>
+          <button data-val="sepia">📜 Sepia</button>
+          <button data-val="malam">🌙 Malam</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- panel daftar isi -->
+    <section class="sheet" id="sheet-toc" hidden aria-label="Daftar isi">
+      <div class="sheet-handle"></div>
+      <h3 class="sheet-title">Daftar Isi</h3>
+      <ul id="toc-list" class="toc-list"></ul>
+    </section>
+  </div>
+
+  <!-- overlay memuat (di level body supaya tampil di layar mana pun) -->
+  <div class="loading-overlay" id="loading-overlay" hidden>
+    <div class="spinner"></div>
+    <p id="loading-text">Memuat buku…</p>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="lib/jszip.min.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/parse.js"></script>
+  <script src="js/script.js"></script>
+</body>
+</html>

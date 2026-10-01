@@ -1,0 +1,15 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Buka Website di Browser",
+			"type": "shell",
+			"command": "Start-Process",
+			"args": [
+				"index.html"
+			],
+			"problemMatcher": [],
+			"group": "none"
+		}
+	]
+}
