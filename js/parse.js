@@ -39,6 +39,41 @@
     });
   }
 
+  function mimeFromPath(p) {
+    const ext = String(p || '').split('.').pop().toLowerCase();
+    if (ext === 'png') return 'image/png';
+    if (ext === 'gif') return 'image/gif';
+    if (ext === 'webp') return 'image/webp';
+    if (ext === 'svg') return 'image/svg+xml';
+    return 'image/jpeg';
+  }
+
+  /** Perkecil sampul (sisi terpanjang \u2264 420px) \u2192 JPEG, supaya hemat penyimpanan. */
+  function optimizeCover(dataUrl) {
+    return new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const MAX = 420;
+          let w = img.naturalWidth, h = img.naturalHeight;
+          if (!w || !h) { resolve(null); return; }
+          const scale = Math.min(1, MAX / Math.max(w, h));
+          w = Math.max(1, Math.round(w * scale));
+          h = Math.max(1, Math.round(h * scale));
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#fff';
+          ctx.fillRect(0, 0, w, h);
+          ctx.drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.82));
+        } catch (e) { resolve(null); }
+      };
+      img.onerror = () => resolve(null);
+      img.src = dataUrl;
+    });
+  }
+
   /* ---------------- TXT ---------------- */
 
   const CHAPTER_RE = /^(bab\s+|chapter\s+|bagian\s+|part\s+|prolog|prologue|epilog|epilogue|pengantar|penutup\b)/i;
@@ -216,8 +251,12 @@
     const opfHtml = await zf(opfPath).async('string');
     const opfDoc = new DOMParser().parseFromString(opfHtml, 'text/html');
 
-    let title = (opfDoc.querySelector('title') || {}).textContent || '';
-    title = (title || '').trim();
+    // judul: OPF memakai <dc:title>, tapi saat di-parse sebagai HTML tag-nya jadi DC:TITLE
+    // → cari elemen apa pun yang namanya berakhiran "title"
+    let title = '';
+    const titleEl = Array.from(opfDoc.getElementsByTagName('*'))
+      .find(el => /(^|:)title$/i.test(el.tagName));
+    if (titleEl) title = (titleEl.textContent || '').trim();
 
     const manifest = Object.create(null);
     // NB: pakai getElementsByTagName (bukan selector 'manifest > item') —
@@ -264,7 +303,33 @@
     }
 
     if (!chapters.length) throw new Error('EPUB ini tidak punya bab yang bisa dibaca');
-    return { title: title || fallbackTitle, format: 'epub', chapters };
+
+    // 5. sampul: EPUB3 properties="cover-image", EPUB2 <meta name="cover">, atau <reference type="cover">
+    let cover = null;
+    try {
+      let coverPath = null;
+      let coverMime = '';
+      const byProp = Object.values(manifest).find(m => /\bcover-image\b/.test(m.properties || ''));
+      if (byProp) { coverPath = byProp.path; coverMime = byProp.mediaType; }
+      if (!coverPath) {
+        const meta = Array.from(opfDoc.getElementsByTagName('meta'))
+          .find(x => (x.getAttribute('name') || '').toLowerCase() === 'cover');
+        const item = meta && manifest[meta.getAttribute('content')];
+        if (item) { coverPath = item.path; coverMime = item.mediaType; }
+      }
+      if (!coverPath) {
+        const ref = Array.from(opfDoc.getElementsByTagName('reference'))
+          .find(x => (x.getAttribute('type') || '').toLowerCase() === 'cover');
+        if (ref) coverPath = resolvePath(dirname(opfPath), ref.getAttribute('href') || '');
+      }
+      const entry = coverPath && zf(coverPath);
+      if (entry) {
+        const b64 = await entry.async('base64');
+        cover = await optimizeCover('data:' + (coverMime || mimeFromPath(coverPath)) + ';base64,' + b64);
+      }
+    } catch (e) { cover = null; }
+
+    return { title: title || fallbackTitle, format: 'epub', chapters, cover };
   }
 
   window.BSParse = { parseTxt, parseEpub };

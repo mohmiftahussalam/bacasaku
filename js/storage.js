@@ -11,6 +11,7 @@
   const SETTINGS_KEY = 'bacasaku.settings';
   const CONTENT_PREFIX = 'bacasaku.content.';
   const STATS_KEY = 'bacasaku.stats';
+  const COVER_PREFIX = 'bacasaku.cover.';
 
   let dbPromise = null;
 
@@ -68,6 +69,9 @@
           const list = readMeta();
           list.unshift({ id: book.id, title: book.title, format: book.format, addedAt: book.addedAt });
           writeMeta(list);
+          // sampul (data URL) disimpan terpisah supaya meta tetap ringan
+          if (book.cover) localStorage.setItem(COVER_PREFIX + book.id, book.cover);
+          else localStorage.removeItem(COVER_PREFIX + book.id);
         });
     },
 
@@ -92,10 +96,16 @@
           writeMeta(readMeta().filter(b => b.id !== id));
           localStorage.removeItem(PROGRESS_PREFIX + id);
           localStorage.removeItem(BOOKMARK_PREFIX + id);
+          localStorage.removeItem(COVER_PREFIX + id);
         });
     },
 
     listBooks() { return readMeta(); },
+
+    /** Sampul buku (data URL) bila ada. */
+    getCover(id) {
+      try { return localStorage.getItem(COVER_PREFIX + id); } catch (e) { return null; }
+    },
 
     getProgress(id) {
       try { return JSON.parse(localStorage.getItem(PROGRESS_PREFIX + id) || 'null'); }
@@ -147,7 +157,11 @@
             app: 'bacasaku',
             version: 1,
             exportedAt: new Date().toISOString(),
-            books: full.filter(Boolean),
+            books: full.filter(Boolean).map(b => {
+              const cover = this.getCover(b.id);
+              if (cover) b.cover = cover;
+              return b;
+            }),
             progress: {},
             bookmarks: {},
             stats: this.getStats(),

@@ -62,6 +62,10 @@
     btnExport: $('btn-export'),
     btnRestore: $('btn-restore'),
     fileData: $('file-data'),
+    libQuote: $('lib-quote'),
+    quoteText: $('quote-text'),
+    quoteSrc: $('quote-src'),
+    quoteAgain: $('quote-again'),
     scrubPreview: $('scrub-preview'),
     scrubPage: $('scrub-page'),
     scrubChapter: $('scrub-chapter')
@@ -200,8 +204,12 @@
       const li = document.createElement('li');
       li.className = 'book-card' + (isRecent ? ' recent' : '');
       li.dataset.id = b.id;
+      const cover = BSStorage.getCover(b.id);
+      const gen = escapeHtml(b.title.length > 30 ? b.title.slice(0, 28) + '…' : b.title);
       li.innerHTML =
-        '<div class="book-cover">' + (b.format === 'epub' ? '📘' : '📄') + '</div>' +
+        '<div class="book-cover">' + (cover
+          ? '<img src="' + cover + '" alt="">'
+          : '<span class="cover-gen">' + gen + '</span>') + '</div>' +
         '<div class="book-info">' +
           '<div class="book-title">' + escapeHtml(b.title) + '</div>' +
           '<div class="book-meta">' + b.format.toUpperCase() +
@@ -213,7 +221,45 @@
         '<button class="book-delete" title="Hapus buku" aria-label="Hapus buku">✕</button>';
       el.bookList.appendChild(li);
     });
+    renderQuote();
   }
+
+  /* ---------------- kutipan acak (idle) di layar pustaka ---------------- */
+  let quoteSig = '';
+  let lastQuoteId = null;
+
+  function renderQuote(force) {
+    const metas = BSStorage.listBooks();
+    if (!metas.length) { quoteSig = ''; el.libQuote.hidden = true; return; }
+    const sig = metas.map(m => m.id).sort().join(',');
+    if (!force && sig === quoteSig && !el.libQuote.hidden) return;
+    quoteSig = sig;
+    const pool = (metas.length > 1 && lastQuoteId)
+      ? metas.filter(m => m.id !== lastQuoteId)
+      : metas;
+    const pick = pool[Math.floor(Math.random() * pool.length)] || metas[0];
+    BSStorage.getBook(pick.id).then(book => {
+      if (sig !== quoteSig) return; // daftar buku sudah berubah
+      lastQuoteId = book.id;
+      const chs = (book.chapters || []).filter(c => c && c.html);
+      if (!chs.length) { el.libQuote.hidden = true; return; }
+      const ch = chs[Math.floor(Math.random() * chs.length)];
+      const div = document.createElement('div');
+      div.innerHTML = ch.html;
+      const text = (div.textContent || '').replace(/\s+/g, ' ').trim();
+      const sents = (text.match(/[^.!?…]+[.!?…”]+|[^.!?…]+$/g) || [])
+        .map(s => s.trim()).filter(s => s.length >= 60 && s.length <= 260);
+      const cand = sents.length ? sents : (text ? [text] : []);
+      if (!cand.length) { el.libQuote.hidden = true; return; }
+      let q = cand[Math.floor(Math.random() * cand.length)];
+      if (q.length > 240) q = q.slice(0, 237).trim() + '…';
+      el.quoteText.textContent = '\u201c' + q + '\u201d';
+      el.quoteSrc.textContent = book.title + (chs.length > 1 ? ' · ' + ch.title : '');
+      el.libQuote.hidden = false;
+    }).catch(() => { el.libQuote.hidden = true; });
+  }
+
+  el.quoteAgain.addEventListener('click', () => renderQuote(true));
 
   el.libSort.addEventListener('change', () => {
     settings.libSort = el.libSort.value;
@@ -255,7 +301,8 @@
         title: (parsed.title || fallbackTitle).trim(),
         format: parsed.format,
         addedAt: Date.now(),
-        chapters: parsed.chapters
+        chapters: parsed.chapters,
+        cover: parsed.cover || null
       };
       return BSStorage.saveBook(book).then(() => book);
     }).then(book => {

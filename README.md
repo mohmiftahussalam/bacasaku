@@ -17,6 +17,8 @@ Aplikasi baca buku (**EPUB** & **TXT**) yang berjalan di browser HP, terinspiras
 - **🔖 Penanda halaman** — tandai halaman penting, daftarnya tersimpan per buku
 - **📊 Statistik membaca** — total waktu & rekor hari beruntun (dilihat lewat tombol 📊)
 - **Urutan pustaka** — Terakhir dibaca / Terbaru / Judul A–Z
+- **🖼️ Sampul buku asli** — cover EPUB diekstrak otomatis (diperkecil hemat storage); TXT/EPUB tanpa cover mendapat kartu judul generik
+- **🎲 Kutipan acak** — kalimat acak dari buku yang kamu punya, tampil di layar pustaka (tap 🎲 untuk ganti)
 - **📤 Ekspor & impor cadangan** — semua data (buku + isi, progres, penanda, statistik, setelan) disimpan dalam 1 file JSON lewat tombol **⋯**
 - **📲 PWA — pasang di layar HP** — tambahkan ke homescreen seperti app native; bisa dibuka **offline** (service worker + manifest)
 
@@ -82,5 +84,5 @@ Catatan:
 ## Rencana Berikutnya
 
 - Highlight & anotasi teks
-- Kutipan acak di layar awal ala idle screen Xteink
+- Cari teks dalam buku
 - Mode terang/gelap otomatis mengikuti sistem
