@@ -13,6 +13,12 @@ Aplikasi baca buku (**EPUB** & **TXT**) yang berjalan di browser HP, terinspiras
 - **Setelan baca**: ukuran teks, font (serif/sans/mono), jarak baris, margin
 - **3 tema**: ☀️ Terang, 📜 Sepia, 🌙 Malam (nyaman untuk baca malam hari)
 - **Daftar isi** per bab + **progres baca** yang tersimpan otomatis (dilanjut lagi saat dibuka)
+- **🎚️ Scrubber progres** — seret slider di bar bawah untuk melompat ke halaman mana pun; muncul pratinjau "Hal. x / y" + judul bab saat diseret
+- **🔖 Penanda halaman** — tandai halaman penting, daftarnya tersimpan per buku
+- **📊 Statistik membaca** — total waktu & rekor hari beruntun (dilihat lewat tombol 📊)
+- **Urutan pustaka** — Terakhir dibaca / Terbaru / Judul A–Z
+- **📤 Ekspor & impor cadangan** — semua data (buku + isi, progres, penanda, statistik, setelan) disimpan dalam 1 file JSON lewat tombol **⋯**
+- **📲 PWA — pasang di layar HP** — tambahkan ke homescreen seperti app native; bisa dibuka **offline** (service worker + manifest)
 
 ## Cara Menjalankan
 
@@ -54,14 +60,17 @@ Catatan:
 ## Struktur Proyek
 
 ```text
-├── index.html         → shell aplikasi (layar pustaka + layar baca)
-├── css/style.css      → gaya mobile-first, tema terang/sepia/malam
+├── index.html           → shell aplikasi (layar pustaka + layar baca)
+├── manifest.webmanifest → manifest PWA (nama, ikon, mode standalone)
+├── sw.js                → service worker (cache aset → jalan offline)
+├── css/style.css        → gaya mobile-first, tema terang/sepia/malam
 ├── js/
-│   ├── storage.js     → simpan buku (IndexedDB), progres, setelan
-│   ├── parse.js       → parser file TXT & EPUB
-│   └── script.js      → logika utama (gestur, halaman, setelan)
-├── lib/jszip.min.js   → library untuk membuka file EPUB (format ZIP)
-└── contoh/            → file contoh untuk uji coba
+│   ├── storage.js       → simpan buku (IndexedDB), progres, cadangan
+│   ├── parse.js         → parser file TXT & EPUB
+│   └── script.js        → logika utama (gestur, halaman, setelan, PWA)
+├── img/                 → ikon app (SVG + PNG 180/192/512)
+├── lib/jszip.min.js     → library untuk membuka file EPUB (format ZIP)
+└── contoh/              → file contoh untuk uji coba
 ```
 
 ## Belajar Vibecoding dengan Proyek Ini
@@ -72,6 +81,6 @@ Catatan:
 
 ## Rencana Berikutnya
 
-- Bookmark, highlight & anotasi (fitur utama berikutnya)
+- Highlight & anotasi teks
 - Kutipan acak di layar awal ala idle screen Xteink
-- Statistik kebiasaan membaca
+- Mode terang/gelap otomatis mengikuti sistem

@@ -263,6 +263,25 @@ body.focus-mode .reader-bar{
 body.focus-mode .reader-top{ transform: translate(-50%, -10px); }
 body.focus-mode .reader-bottom{ transform: translate(-50%, 10px); }
 
+/* gelembung pratinjau saat slider progres digeser */
+.scrub-preview{
+  position: absolute; left: 50%; bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  background: #211f1c; color: #f7f5f0;
+  padding: 7px 12px; border-radius: 10px;
+  text-align: center; line-height: 1.3;
+  box-shadow: 0 6px 18px rgba(0,0,0,.3);
+  pointer-events: none; white-space: nowrap; z-index: 7;
+}
+.scrub-preview b{
+  display: block; font-size: 13.5px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.scrub-preview span{
+  display: block; font-size: 11px; opacity: .75;
+  max-width: 190px; overflow: hidden; text-overflow: ellipsis;
+}
+
 /* ---------- panel bawah (sheet) ---------- */
 .sheet-backdrop{
   position: absolute; inset: 0; z-index: 8;
@@ -408,10 +427,10 @@ input[type="range"]::-moz-range-thumb{
 @keyframes spin{ to{ transform: rotate(360deg); } }
 
 /* ---------- statistik ---------- */
-/* sheet ini menempel di viewport (bukan di dalam #screen-reader),
+/* sheet level body (statistik, data) menempel di viewport,
    z-index di atas header pustaka (10) & FAB (20) */
-#stats-backdrop{ position: fixed; z-index: 70; }
-#sheet-stats{ position: fixed; z-index: 71; }
+body > .sheet-backdrop{ position: fixed; z-index: 70; }
+body > .sheet{ position: fixed; z-index: 71; }
 
 .stat-cards{
   display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
@@ -457,6 +476,18 @@ input[type="range"]::-moz-range-thumb{
   background: var(--bg); border: 1px solid var(--line);
 }
 .btn-ghost:active{ background: var(--line); }
+
+/* ---------- sheet data & cadangan ---------- */
+.data-note{
+  font-size: 13px; color: var(--muted); line-height: 1.55;
+  margin: 8px 0 14px;
+}
+.data-note b{ color: var(--fg); }
+.data-actions{ display: grid; gap: 10px; }
+.data-actions .btn-primary{
+  width: 100%; padding: 13px; border-radius: 12px; box-shadow: none;
+}
+.data-actions .btn-ghost{ margin-top: 0; }
 
 /* ---------- toast ---------- */
 .toast{

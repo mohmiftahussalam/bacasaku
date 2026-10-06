@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Ikon BacaSaku: buku terbuka + pita penanda, latar amber (aksen tema) -->
+  <rect width="512" height="512" fill="#b45309"/>
+  <g fill="#ffffff">
+    <path d="M250 168 C 214 140 160 132 104 140 L104 352 C160 344 214 352 250 380 Z"/>
+    <path d="M262 168 C 298 140 352 132 408 140 L408 352 C352 344 298 352 262 380 Z"/>
+  </g>
+  <!-- pita penanda menyelip halaman kanan (warna = latar, terlihat di atas halaman putih) -->
+  <path d="M336 128 h44 v94 l-22 -18 l-22 18 Z" fill="#b45309"/>
+  <!-- garis teks halaman kiri -->
+  <g fill="#b45309" opacity=".28">
+    <rect x="130" y="200" width="90" height="10" rx="5"/>
+    <rect x="130" y="232" width="90" height="10" rx="5"/>
+    <rect x="130" y="264" width="64" height="10" rx="5"/>
+  </g>
+</svg>

@@ -135,6 +135,56 @@
 
     saveSettings(settings) {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    },
+
+    /* ---------- cadangan (ekspor / pulihkan) ---------- */
+    /** Kumpulkan SELURUH data → 1 objek cadangan (isi buku diambil dari IndexedDB). */
+    collectBackup() {
+      const metas = readMeta();
+      return Promise.all(metas.map(m => this.getBook(m.id).catch(() => null)))
+        .then(full => {
+          const backup = {
+            app: 'bacasaku',
+            version: 1,
+            exportedAt: new Date().toISOString(),
+            books: full.filter(Boolean),
+            progress: {},
+            bookmarks: {},
+            stats: this.getStats(),
+            settings: this.getSettings()
+          };
+          metas.forEach(m => {
+            const p = this.getProgress(m.id);
+            if (p) backup.progress[m.id] = p;
+            const bm = this.getBookmarks(m.id);
+            if (bm.length) backup.bookmarks[m.id] = bm;
+          });
+          return backup;
+        });
+    },
+
+    /** Ganti SEMUA data di perangkat dengan isi cadangan. */
+    restoreBackup(data) {
+      const list = Array.isArray(data.books) ? data.books : [];
+      return idb('readwrite', s => s.clear())
+        .catch(() => { /* IndexedDB tidak ada → lanjut bersihkan localStorage */ })
+        .then(() => {
+          // hapus sisa data lama (semua key ber-prefix bacasaku.)
+          for (let i = localStorage.length - 1; i >= 0; i--) {
+            const k = localStorage.key(i);
+            if (k && k.indexOf('bacasaku.') === 0) localStorage.removeItem(k);
+          }
+          return Promise.all(list.map(b => this.saveBook(b)));
+        })
+        .then(() => {
+          const set = (k, v) => { if (v != null) localStorage.setItem(k, JSON.stringify(v)); };
+          const prog = data.progress || {};
+          const bms = data.bookmarks || {};
+          Object.keys(prog).forEach(id => set(PROGRESS_PREFIX + id, prog[id]));
+          Object.keys(bms).forEach(id => set(BOOKMARK_PREFIX + id, bms[id]));
+          set(STATS_KEY, data.stats);
+          set(SETTINGS_KEY, data.settings);
+        });
     }
   };
 

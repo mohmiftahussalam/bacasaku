@@ -4,8 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#f7f5f0">
+  <meta name="description" content="BacaSaku — e-reader saku untuk HP: baca EPUB & TXT nyaman, lengkap dengan penanda halaman, statistik baca, dan pustaka.">
   <title>BacaSaku — Baca nyaman di HP</title>
   <link rel="stylesheet" href="css/style.css">
+  <!-- PWA: bisa di-install ke layar utama & dibuka offline -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="img/icon.svg">
+  <link rel="apple-touch-icon" href="img/icon-180.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="BacaSaku">
 </head>
 <body data-theme="terang">
 
@@ -15,6 +24,7 @@
       <div class="brand">Baca<span>Saku</span></div>
       <div class="lib-actions">
         <button id="btn-stats" class="icon-btn" title="Statistik baca">📊</button>
+        <button id="btn-more" class="icon-btn" title="Data &amp; cadangan">⋯</button>
         <button id="btn-import-top" class="icon-btn" title="Impor buku">＋</button>
       </div>
     </header>
@@ -63,6 +73,9 @@
 
     <!-- bilah bawah: progres -->
     <footer class="reader-bar reader-bottom" id="reader-bottom">
+      <div class="scrub-preview" id="scrub-preview" hidden>
+        <b id="scrub-page">Hal. 1</b><span id="scrub-chapter">—</span>
+      </div>
       <span class="chapter-label" id="chapter-label">—</span>
       <input type="range" id="progress-slider" min="1" max="100" value="1" step="1" aria-label="Progres baca">
       <span class="page-label" id="page-label">1 / 1</span>
@@ -154,6 +167,19 @@
     <p class="stat-note">Waktu baca 7 hari terakhir</p>
 
     <button class="btn-ghost" id="btn-stats-close">Tutup</button>
+  </section>
+
+  <!-- panel data & cadangan (level body — dibuka dari pustaka) -->
+  <div class="sheet-backdrop" id="data-backdrop" hidden></div>
+  <section class="sheet" id="sheet-data" hidden aria-label="Data dan cadangan">
+    <div class="sheet-handle"></div>
+    <h3 class="sheet-title">🗄️ Data &amp; Cadangan</h3>
+    <p class="data-note">Cadangan berisi <b>seluruh pustaka</b> (termasuk isi buku), progres, penanda halaman, statistik, dan setelan — semua dalam 1 file JSON.</p>
+    <div class="data-actions">
+      <button class="btn-primary" id="btn-export">📤 Ekspor ke file</button>
+      <button class="btn-ghost" id="btn-restore">📥 Pulihkan dari file</button>
+    </div>
+    <input type="file" id="file-data" accept=".json,application/json" hidden>
   </section>
 
   <div id="toast" class="toast" hidden></div>

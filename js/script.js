@@ -55,7 +55,16 @@
     stStreak: $('st-streak'),
     stTotal: $('st-total'),
     stBooks: $('st-books'),
-    statChart: $('stat-chart')
+    statChart: $('stat-chart'),
+    btnMore: $('btn-more'),
+    sheetData: $('sheet-data'),
+    dataBackdrop: $('data-backdrop'),
+    btnExport: $('btn-export'),
+    btnRestore: $('btn-restore'),
+    fileData: $('file-data'),
+    scrubPreview: $('scrub-preview'),
+    scrubPage: $('scrub-page'),
+    scrubChapter: $('scrub-chapter')
   };
 
   const FONTS = {
@@ -66,10 +75,9 @@
   const THEME_COLORS = { terang: '#f7f5f0', sepia: '#efe5d0', malam: '#141317' };
 
   /* ---------------- state ---------------- */
-  let settings = Object.assign(
-    { size: 18, font: 'serif', leading: 1.7, margin: 18, theme: 'terang', libSort: 'recent' },
-    BSStorage.getSettings() || {}
-  );
+  const DEFAULT_SETTINGS =
+    { size: 18, font: 'serif', leading: 1.7, margin: 18, theme: 'terang', libSort: 'recent' };
+  let settings = Object.assign({}, DEFAULT_SETTINGS, BSStorage.getSettings() || {});
   let books = [];          // meta buku
   let current = null;      // buku yang sedang dibaca
   let bookmarks = [];      // penanda halaman buku saat ini
@@ -80,6 +88,7 @@
   let relayoutTimer = null;
   let stats = BSStorage.getStats();   // { days: { 'YYYY-MM-DD': detik } }
   let lastStatTick = Date.now();
+  let scrubbing = false;    // true saat slider progres sedang digeser
 
   /* ---------------- util ---------------- */
   function escapeHtml(s) {
@@ -369,7 +378,8 @@
       applyTransform();
     }
     updateHud();
-    BSStorage.setProgress(current.id, page, pages);
+    // saat scrubbing, progres ditulis nanti (saat slider dilepas)
+    if (!scrubbing) BSStorage.setProgress(current.id, page, pages);
   }
 
   function computeChapterStarts() {
@@ -552,11 +562,14 @@
 
   /* ---------------- panel (sheet) ---------------- */
   function sheetsClosed() {
-    return el.sheetSettings.hidden && el.sheetToc.hidden && el.sheetStats.hidden;
+    return el.sheetSettings.hidden && el.sheetToc.hidden &&
+      el.sheetStats.hidden && el.sheetData.hidden;
   }
 
   function backdropFor(sheet) {
-    return sheet === el.sheetStats ? el.statsBackdrop : el.sheetBackdrop;
+    if (sheet === el.sheetStats) return el.statsBackdrop;
+    if (sheet === el.sheetData) return el.dataBackdrop;
+    return el.sheetBackdrop;
   }
 
   function openSheet(sheet) {
@@ -571,13 +584,13 @@
   }
 
   function closeSheets(instant) {
-    [el.sheetSettings, el.sheetToc, el.sheetStats].forEach(s => {
+    [el.sheetSettings, el.sheetToc, el.sheetStats, el.sheetData].forEach(s => {
       if (s.hidden) return;
       s.classList.remove('open');
       const hide = () => { if (!s.classList.contains('open')) s.hidden = true; };
       instant ? hide() : setTimeout(hide, 300);
     });
-    [el.sheetBackdrop, el.statsBackdrop].forEach(bd => {
+    [el.sheetBackdrop, el.statsBackdrop, el.dataBackdrop].forEach(bd => {
       if (bd.hidden) return;
       bd.classList.remove('open');
       const hideBd = () => { if (!bd.classList.contains('open')) bd.hidden = true; };
@@ -587,6 +600,7 @@
 
   el.sheetBackdrop.addEventListener('click', () => closeSheets());
   el.statsBackdrop.addEventListener('click', () => closeSheets());
+  el.dataBackdrop.addEventListener('click', () => closeSheets());
   el.btnSettings.addEventListener('click', () => openSheet(el.sheetSettings));
   el.btnToc.addEventListener('click', () => {
     buildToc();
@@ -708,6 +722,72 @@
   el.btnStats.addEventListener('click', openStats);
   el.btnStatsClose.addEventListener('click', () => closeSheets());
 
+  /* ---------------- data & cadangan ---------------- */
+  el.btnMore.addEventListener('click', () => openSheet(el.sheetData));
+
+  el.btnExport.addEventListener('click', () => {
+    showLoading('Menyiapkan cadangan…');
+    BSStorage.collectBackup().then(backup => {
+      const blob = new Blob([JSON.stringify(backup, null, 2)],
+        { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'bacasaku-cadangan-' + dayKey() + '.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      hideLoading();
+      closeSheets();
+      toast('Cadangan diekspor — ' + backup.books.length + ' buku 📤');
+    }).catch(err => {
+      console.error(err);
+      hideLoading();
+      toast('Gagal mengekspor: ' + (err.message || ''));
+    });
+  });
+
+  el.btnRestore.addEventListener('click', () => el.fileData.click());
+
+  el.fileData.addEventListener('change', () => {
+    const file = el.fileData.files && el.fileData.files[0];
+    el.fileData.value = '';
+    if (!file) return;
+    file.text()
+      .then(JSON.parse)
+      .then(data => {
+        if (!data || data.app !== 'bacasaku' || !Array.isArray(data.books)) {
+          throw new Error('file bukan cadangan BacaSaku');
+        }
+        const n = data.books.length;
+        const ok = confirm(
+          'Pulihkan cadangan "' + file.name + '" (' + n + ' buku)?\n' +
+          'SEMUA data di perangkat ini akan DIGANTI isi cadangan.');
+        if (!ok) return null;
+        showLoading('Memulihkan cadangan…');
+        return BSStorage.restoreBackup(data).then(() => n);
+      })
+      .then(n => {
+        if (n == null) return;
+        settings = Object.assign({}, DEFAULT_SETTINGS, BSStorage.getSettings() || {});
+        stats = BSStorage.getStats();
+        applySettings();
+        renderLibrary();
+        hideLoading();
+        closeSheets();
+        toast('Cadangan dipulihkan ✓ ' + n + ' buku');
+      })
+      .catch(err => {
+        console.error(err);
+        hideLoading();
+        const msg = (err instanceof SyntaxError)
+          ? 'file bukan JSON yang valid'
+          : (err.message || 'tidak diketahui');
+        toast('Gagal memulihkan: ' + msg);
+      });
+  });
+
   /* ---------------- kontrol setelan ---------------- */
   el.setSize.addEventListener('input', () => {
     settings.size = Number(el.setSize.value);
@@ -741,8 +821,42 @@
     renderLibrary();
   }
 
+  /* ---------------- scrubber progres ---------------- */
+  /* Geser slider → halaman ikut jari tanpa animasi, gelembung
+     "Hal. X / Y" tampil mengikuti thumb; progres ditulis saat dilepas. */
+  let scrubHideTimer = null;
+
+  function showScrubPreview() {
+    const v = Number(el.progressSlider.value);
+    el.scrubPage.textContent = 'Hal. ' + v + ' / ' + pages;
+    el.scrubChapter.textContent = currentChapterTitle();
+    el.scrubPreview.hidden = false;
+    const w = el.progressSlider.clientWidth || 1;
+    const pct = pages > 1 ? (v - 1) / (pages - 1) : 0;
+    const x = el.progressSlider.offsetLeft +
+      Math.max(36, Math.min(w - 36, pct * w));
+    el.scrubPreview.style.left = x + 'px';
+    clearTimeout(scrubHideTimer);
+    scrubHideTimer = setTimeout(() => { el.scrubPreview.hidden = true; }, 1400);
+  }
+
+  el.progressSlider.addEventListener('pointerdown', () => { scrubbing = true; });
+
+  ['pointerup', 'pointercancel'].forEach(evt =>
+    window.addEventListener(evt, () => {
+      if (!scrubbing) return;
+      scrubbing = false;
+      if (current) BSStorage.setProgress(current.id, page, pages);
+    }));
+
   el.progressSlider.addEventListener('input', () => {
-    goTo(Number(el.progressSlider.value) - 1);
+    if (!current) return;
+    goTo(Number(el.progressSlider.value) - 1, !scrubbing);
+    showScrubPreview();
+  });
+
+  el.progressSlider.addEventListener('change', () => {
+    if (current) BSStorage.setProgress(current.id, page, pages);
   });
 
   let resizeTimer = null;
@@ -753,6 +867,12 @@
   });
 
   /* ---------------- mulai ---------------- */
+  /* PWA: daftarkan service worker hanya di http(s) — file:// tidak didukung */
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+    navigator.serviceWorker.register('sw.js')
+      .catch(err => console.warn('Service worker gagal didaftarkan:', err));
+  }
+
   applySettings();
   renderLibrary();
 })();
